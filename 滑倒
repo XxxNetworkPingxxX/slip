@@ -145,7 +145,6 @@ local function applySlipEffect(character)
             return
         end
         
-        -- 去掉速度限制逻辑，只保留助推效果
         if humanoidRootPart.AssemblyLinearVelocity.Magnitude < (originalWalkSpeed * 0.8) then
             local currentVel = humanoidRootPart.AssemblyLinearVelocity
             local horizontalVel = Vector3.new(currentVel.X, 0, currentVel.Z)
