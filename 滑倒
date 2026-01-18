@@ -1,0 +1,302 @@
+--由XxxNetworkPingxxX制作此脚本
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+
+local lp = Players.LocalPlayer
+
+if not lp then
+    lp = Players.PlayerAdded:Wait()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SlipGUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = lp:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 200, 0, 100)
+MainFrame.Position = UDim2.new(0.5, -100, 0, 10)
+MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+local TitleBar = Instance.new("Frame")
+TitleBar.Name = "TitleBar"
+TitleBar.Size = UDim2.new(1, 0, 0, 25)
+TitleBar.Position = UDim2.new(0, 0, 0, 0)
+TitleBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Name = "TitleLabel"
+TitleLabel.Size = UDim2.new(1, -50, 1, 0)
+TitleLabel.Position = UDim2.new(0, 5, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "滑倒"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+TitleLabel.TextSize = 14
+TitleLabel.Font = Enum.Font.Gotham
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TitleBar
+
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Name = "MinimizeButton"
+MinimizeButton.Size = UDim2.new(0, 20, 0, 20)
+MinimizeButton.Position = UDim2.new(1, -45, 0, 2)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+MinimizeButton.BorderSizePixel = 0
+MinimizeButton.Text = "-"
+MinimizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MinimizeButton.TextSize = 14
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.Parent = TitleBar
+
+local CloseButton = Instance.new("TextButton")
+CloseButton.Name = "CloseButton"
+CloseButton.Size = UDim2.new(0, 20, 0, 20)
+CloseButton.Position = UDim2.new(1, -20, 0, 2)
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+CloseButton.BorderSizePixel = 0
+CloseButton.Text = "×"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.TextSize = 12
+CloseButton.Font = Enum.Font.Gotham
+CloseButton.Parent = TitleBar
+
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Name = "ContentFrame"
+ContentFrame.Size = UDim2.new(1, 0, 1, -25)
+ContentFrame.Position = UDim2.new(0, 0, 0, 25)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleButton"
+ToggleButton.Size = UDim2.new(0, 120, 0, 40)
+ToggleButton.Position = UDim2.new(0.5, -60, 0.5, -20)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+ToggleButton.BorderSizePixel = 0
+ToggleButton.Text = "开启"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.TextSize = 16
+ToggleButton.Font = Enum.Font.Gotham
+ToggleButton.Parent = ContentFrame
+
+local isEnabled = false
+local currentConnections = {}
+
+local function applySlipEffect(character)
+    if not character then return end
+    
+    task.wait(0.3)
+    
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+    
+    local originalWalkSpeed = humanoid.WalkSpeed
+    local originalJumpPower = humanoid.JumpPower
+    
+    humanoid.PlatformStand = true
+    
+    local currentVelocity = humanoidRootPart.AssemblyLinearVelocity
+    local slideDirection = currentVelocity.Unit
+    
+    if slideDirection.Magnitude < 0.1 then
+        slideDirection = Vector3.new(
+            math.random(-1, 1),
+            0,
+            math.random(-1, 1)
+        ).Unit
+    end
+    
+    local slideForce = slideDirection * (originalWalkSpeed * 4)
+    humanoidRootPart:ApplyImpulse(Vector3.new(slideForce.X, 0, slideForce.Z))
+    
+    local spinForce = Vector3.new(
+        0,
+        math.random(-originalWalkSpeed * 2, originalWalkSpeed * 2),
+        0
+    )
+    humanoidRootPart:ApplyAngularImpulse(spinForce)
+    
+    humanoid.WalkSpeed = 0
+    humanoid.JumpPower = 0
+    
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local slipperyProperties = PhysicalProperties.new(
+                1.0, 0.1, 0.3, 0.2, 0.5
+            )
+            part.CustomPhysicalProperties = slipperyProperties
+        end
+    end
+    
+    local heartbeatConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not character or not character.Parent or not isEnabled then
+            return
+        end
+        
+        -- 去掉速度限制逻辑，只保留助推效果
+        if humanoidRootPart.AssemblyLinearVelocity.Magnitude < (originalWalkSpeed * 0.8) then
+            local currentVel = humanoidRootPart.AssemblyLinearVelocity
+            local horizontalVel = Vector3.new(currentVel.X, 0, currentVel.Z)
+            
+            if horizontalVel.Magnitude < (originalWalkSpeed * 0.5) then
+                local pushForce = slideDirection * (originalWalkSpeed * 2)
+                humanoidRootPart:ApplyForce(Vector3.new(pushForce.X, 0, pushForce.Z))
+            end
+        end
+    end)
+    
+    table.insert(currentConnections, heartbeatConnection)
+    
+    local restoreFunction = function()
+        if humanoid and humanoid.Parent then
+            humanoid.PlatformStand = false
+            humanoid.WalkSpeed = originalWalkSpeed
+            humanoid.JumpPower = originalJumpPower
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+        
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CustomPhysicalProperties = nil
+            end
+        end
+    end
+    
+    table.insert(currentConnections, {restore = restoreFunction})
+    
+    return true
+end
+
+local function cleanupSlipEffect()
+    for _, connection in ipairs(currentConnections) do
+        if type(connection) == "function" then
+            connection:Disconnect()
+        elseif type(connection) == "table" and connection.restore then
+            connection.restore()
+        end
+    end
+    currentConnections = {}
+end
+
+local function toggleSlipMode()
+    isEnabled = not isEnabled
+
+    if isEnabled then
+        ToggleButton.Text = "关闭"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+
+        if lp.Character then
+            applySlipEffect(lp.Character)
+        end
+
+        local charConnection = lp.CharacterAdded:Connect(function(character)
+            if isEnabled then
+                task.wait(0.5)
+                applySlipEffect(character)
+            end
+        end)
+        
+        table.insert(currentConnections, charConnection)
+
+        game:GetService("StarterGui"):SetCore("SendNotification",{
+            Title = "滑倒",
+            Text = "滑倒已开启",
+            Duration = 3
+        })
+    else
+        ToggleButton.Text = "开启"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+
+        cleanupSlipEffect()
+
+        game:GetService("StarterGui"):SetCore("SendNotification",{
+            Title = "滑倒",
+            Text = "滑倒已关闭",
+            Duration = 3
+        })
+    end
+end
+
+ToggleButton.MouseButton1Click:Connect(toggleSlipMode)
+
+CloseButton.MouseButton1Click:Connect(function()
+    isEnabled = false
+    cleanupSlipEffect()
+    ScreenGui:Destroy()
+end)
+
+local minimized = false
+MinimizeButton.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        MainFrame.Size = UDim2.new(0, 200, 0, 25)
+        MinimizeButton.Text = "+"
+        ContentFrame.Visible = false
+    else
+        MainFrame.Size = UDim2.new(0, 200, 0, 100)
+        MinimizeButton.Text = "-"
+        ContentFrame.Visible = true
+    end
+end)
+
+local function addCorner(parent)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = parent
+end
+
+addCorner(MainFrame)
+addCorner(TitleBar)
+addCorner(ToggleButton)
+addCorner(MinimizeButton)
+addCorner(CloseButton)
+
+ToggleButton.MouseEnter:Connect(function()
+    if isEnabled then
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+    else
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    end
+end)
+
+ToggleButton.MouseLeave:Connect(function()
+    if isEnabled then
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 180, 60)
+    else
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
+end)
+
+MinimizeButton.MouseEnter:Connect(function()
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+end)
+
+MinimizeButton.MouseLeave:Connect(function()
+    MinimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+end)
+
+CloseButton.MouseEnter:Connect(function()
+    CloseButton.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+end)
+
+CloseButton.MouseLeave:Connect(function()
+    CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+end)
+
+game:GetService("StarterGui"):SetCore("SendNotification",{
+    Title = "滑倒脚本",
+    Text = "脚本加载成功",
+    Duration = 3
+})
